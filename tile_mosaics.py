@@ -10,20 +10,8 @@ tiles_dir = 'mosaic_tiles'
 def get_tile_dir() -> str:
     return tiles_dir
 
-def tile_mosaic(file: str, tile_size = (200,200)):
-    """
-    file is the filepath to the mosaic
-    tile_size is the size of the tiles you want to create
-
-    If the size of the image at file does not fit tile_size, it will be padded with 0 values
-    """
-    if not file.endswith('.tif') and file.endswith('.TIF'):
-        raise ValueError(f'File {file} is not a .tif or .TIF file')
-    # make tile directory if it doesn't exist
-    if not os.path.exists(tiles_dir):
-        os.mkdir(tiles_dir)
+def tile_file(file: str, tile_size = (200,200)):
     tw, th = tile_size
-
     img_name = file.split(os.path.sep)[-1].split('.')[0]
     # open image and store as numpy array
     img = Image.open(file).convert('L')
@@ -40,7 +28,7 @@ def tile_mosaic(file: str, tile_size = (200,200)):
     for row in range(0, padded_array.shape[0]-1, tw):
         for col in range(0, padded_array.shape[1]-1, th):
             # file name of new tile
-            tile_name = os.path.join(tiles_dir, f"{img_name}_tile_{tile_count}.tif")
+            tile_name = os.path.join(tiles_dir, f"{img_name}-tile_{tile_count}.tif")
             # if tile already exists, skip
             if not os.path.isfile(tile_name):
                 # segment padded array into a tw by th tile
@@ -51,6 +39,20 @@ def tile_mosaic(file: str, tile_size = (200,200)):
                     tile_img.save(tile_name)
                     tile_count += 1
 
+def tile_mosaic(file: str, tile_size = (200,200)):
+    """
+    file is the filepath to the mosaic
+    tile_size is the size of the tiles you want to create
+
+    If the size of the image at file does not fit tile_size, it will be padded with 0 values
+    """
+    if not file.endswith('.tif') and file.endswith('.TIF'):
+        raise ValueError(f'File {file} is not a .tif or .TIF file')
+    # make tile directory if it doesn't exist
+    if not os.path.exists(tiles_dir):
+        os.mkdir(tiles_dir)
+    tile_file(file, tile_size)
+
 def tile_mosaics_dir(dir: str, tile_size = (200, 200)):
     """
     dir is the name of the directory containing the mosaic files
@@ -60,40 +62,12 @@ def tile_mosaics_dir(dir: str, tile_size = (200, 200)):
     # make tile directory if it doesn't exist
     if not os.path.exists(tiles_dir):
         os.mkdir(tiles_dir)
-    tw, th = tile_size
 
     for (root, _, files) in os.walk(dir):
         for file in files:
             path = os.path.join(root, file)
             print(f"Tiling {file}...")
-            img_name = file.split('.')[0]
-            # Below is copied from tile_file
-
-            # open image and store as numpy array
-            img = Image.open(path).convert('L')
-            img_array = np.asarray(img)
-
-            # pad image to be divisible by tw and th
-            padded_array = np.pad(img_array, ((0, int(img.width % tw)), (0, int(img.height % th))))
-            
-            # free up some memory
-            del img, img_array
-            gc.collect()
-
-            tile_count = 0
-            for row in range(0, padded_array.shape[0]-1, tw):
-                for col in range(0, padded_array.shape[1]-1, th):
-                    # file name of new tile
-                    tile_name = os.path.join(tiles_dir, f"{img_name}_tile_{tile_count}.tif")
-                    # if tile already exists, skip
-                    if not os.path.isfile(tile_name):
-                        # segment padded array into a tw by th tile
-                        tile_array = padded_array[row:row+tw][:,col:col+th]
-                        # if tile is all zeroes, skip
-                        if tile_array.any():
-                            tile_img = Image.fromarray(tile_array, 'L')
-                            tile_img.save(tile_name)
-                            tile_count += 1
+            tile_file(path, tile_size)
             
     print("Done tiling!")
 
@@ -116,34 +90,7 @@ def tile_mosaics_from_file(mosaic_file: str, tile_size = (200, 200)):
         if not file.endswith('.tif') and not file.endswith('.TIF'):
             continue
         print(file)
-        img_name = file.split(os.path.sep)[-1].split('.')[0]
-        # Below is copied from tile_file
-
-        # open image and store as numpy array
-        img = Image.open(file).convert('L')
-        img_array = np.asarray(img)
-        
-        # pad image to be divisible by tw and th
-        padded_array = np.pad(img_array, ((0, int(img.width % tw)), (0, int(img.height % th))))
-        
-        # free up some memory
-        del img, img_array
-        gc.collect()
-
-        tile_count = 0
-        for row in range(0, padded_array.shape[0]-1, tw):
-            for col in range(0, padded_array.shape[1]-1, th):
-                # file name of new tile
-                tile_name = os.path.join(tiles_dir, f"{img_name}_tile_{tile_count}.tif")
-                # if tile already exists, skip
-                if not os.path.isfile(tile_name):
-                    # segment padded array into a tw by th tile
-                    tile_array = padded_array[row:row+tw][:,col:col+th]
-                    # if tile is all zeroes, skip
-                    if tile_array.any():
-                        tile_img = Image.fromarray(tile_array, 'L')
-                        tile_img.save(tile_name)
-                        tile_count += 1
+        tile_file(file, tile_size)
         
     print("Done tiling!")
 
