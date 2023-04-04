@@ -12,7 +12,7 @@ Pre-requisites for running the prediction pipeline (`full_pipeline.py`):
 
 ## Using the prediction pipeline
 
-To run `final_pipeline.py`, use the command `python3 final_pipeline.py MOSAIC_FP MODEL_NAME MODEL_FP RESULTS_FP`. Arguments are explained below:
+To run `final_pipeline.py`, use the command `python3 full_pipeline.py MOSAIC_FP MODEL_NAME MODEL_FP RESULTS_FP`. Arguments are explained below:
 - `MOSAIC_FP`: the filepath for the mosaic (or single image) to predict on.
 - `MODEL_NAME`: either "ASPDNet" or "faster_rcnn".
 - `MODEL_FP`: the filepath for the pre-trained model.
