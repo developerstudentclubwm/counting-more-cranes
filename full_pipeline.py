@@ -16,8 +16,6 @@ import torch
 from torch.utils.data import Dataset, DataLoader
 from tile_mosaics import tile_mosaic, get_tile_dir
 
-
-
 sys.path.append(os.path.join(os.getcwd(), 'density_estimation', 'ASPDNet'))
 sys.path.append(os.path.join(os.getcwd(), 'object_detection'))
 
@@ -25,6 +23,8 @@ from utils import *
 from density_estimation.ASPDNet_model import ASPDNetLightning
 from density_estimation.ASPDNet.model import ASPDNet
 from object_detection.faster_rcnn_model import *
+
+Image.MAX_IMAGE_PIXELS = None
 
 def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_workers, model_hyperparams = None, save_preds = False, use_cpu = False):
 
@@ -52,7 +52,6 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
         file_paths = f.readlines()
     
     file_paths = [path.strip() for path in file_paths]
-    
 
     #Store filepaths to mosaics in text file
     for i, path in enumerate(file_paths):
@@ -66,6 +65,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
             device = 'cpu'
         else:
             device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        print(f'Using {device} for prediction...')
 
         #  grabbing any constructor hyperparams - currently, only necessary for our Faster R-CNN impelementation!
         if model_hyperparams is not None:
@@ -106,7 +106,6 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
         total_count = 0
         pl_model.model.eval() #making sure we're in eval mode...
         for i, batch in enumerate(tile_dataloader):
-
 
             print(f'\t\tBatch {i + 1}/{len(tile_dataloader)}')
             tile_batch, tile_nums = batch #getting out the content from the dataloader
@@ -158,8 +157,6 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
         curr_date = str(date.today())
         pipeline_time = time.time() - start_time
         new_row = [curr_date, curr_time, path, len(tile_dataset), int(total_count), model_name, pipeline_time, pred_time] #all of the run results to include
-
-
     
         if not os.path.isfile(write_results_fp): #either creating a new results CSV or adding to the existing file
                 with open(write_results_fp, 'w') as file:
@@ -189,10 +186,11 @@ def tiling_w_o_overlap_NO_BBOXES(image, tile_size = (200, 200)):
     tile_width, tile_height = tile_size
     image_width, image_height = padded_image.size
 
+    padded_image = np.array(padded_image)
+
     #  freeing up memory
     del image
     gc.collect()
-
 
     zero_tensor = torch.zeros(*(tile_size[0], tile_size[1], 3)) #represents a black tile
 
@@ -201,7 +199,7 @@ def tiling_w_o_overlap_NO_BBOXES(image, tile_size = (200, 200)):
         for w in range(0, (image_width + 1) - tile_width, tile_width):
             coords = (w, h, w + tile_width, h + tile_height)
             crop = A.Crop(*coords)
-            t = crop(image = np.array(padded_image))
+            t = crop(image = padded_image)
 
             tile = Image.fromarray(t['image'])
             tensor_tile = torch.from_numpy(np.array(tile))
