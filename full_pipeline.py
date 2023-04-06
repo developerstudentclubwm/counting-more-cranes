@@ -155,12 +155,22 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
                         pil_img.save(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'))
                 elif model_name == 'ASPDNet': #saving the pred densities for each tile
                     cm = plt.get_cmap('jet')
+                    print('BATCH SUM:', float(tile_preds.sum()))
                     for den, num in zip(list(tile_preds), tile_nums):
                         den = den.cpu()
                         colored_image = cm(den.numpy()) #applying the color map... makes it easier to look at!
 
-                        pil_img = Image.fromarray((colored_image * 255).astype(np.uint8)[ : , : , : 3]) #converting to PIL image #the heck 
-                        pil_img.save(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'))
+                        # plotting the density w/the predicted count
+                        fig, ax = plt.subplots()
+
+                        ax.imshow(colored_image)
+                        ax.set_title(round(float(den.sum()), 3))
+                        ax.axis('off')
+                        ax.set_xticks([])
+                        ax.set_yticks([])
+
+                        fig.savefig(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'), dpi = 50, bbox_inches = 'tight')
+                        plt.close(fig)
 
         pred_time = time.time() - pred_start_time
 
@@ -238,7 +248,7 @@ class BirdDatasetPREDICTION(Dataset):
         self.tile_fps = sorted(os.listdir(self.root_dir))
 
         self.transforms = []
-        if model_name == 'ASPDNet': #PyTorch's Faster R-CNN impelementation handles normalization...
+        if model_name == 'ASPDNet': #PyTorch's Faster R-CNN implementation handles normalization...
             self.transforms.append(A.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225], max_pixel_value = 1))
         self.transforms.append(ToTensorV2())
         self.transforms = A.Compose(self.transforms)
