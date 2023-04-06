@@ -7,7 +7,7 @@ import time
 import argparse
 from datetime import date
 import gc
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -148,11 +148,18 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
                         img = (np.moveaxis(img.numpy(), 0, -1) * 255).astype(np.uint8)
                         pred_boxes = tile_preds[i]['boxes'].tolist()
 
+                        offset = 15
+                        background = Image.new('RGB', (img.shape[0], img.shape[1] + offset), (255, 255, 255))
                         pil_img = Image.fromarray(img)
-                        draw = ImageDraw.Draw(pil_img)
+                        Image.Image.paste(background, pil_img, (0, offset))
+
+                        draw = ImageDraw.Draw(background)
                         for b in pred_boxes: #drawing bboxes onto the tile
+                            b = (b[0], b[1] + offset, b[2], b[3] + offset)
                             draw.rectangle(b, outline = 'red', width = 1)
-                        pil_img.save(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'))
+                        draw.text((2, 2), str(len(pred_boxes)), fill = (0, 0, 0))
+
+                        background.save(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'))
                 elif model_name == 'ASPDNet': #saving the pred densities for each tile
                     cm = plt.get_cmap('jet')
                     for den, num in zip(list(tile_preds), tile_nums):
