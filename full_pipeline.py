@@ -24,7 +24,7 @@ from object_detection.faster_rcnn_model import *
 
 Image.MAX_IMAGE_PIXELS = None
 
-def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_workers, model_hyperparams = None, save_preds = False, use_cpu = False):
+def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_workers, model_hyperparams = None, save_preds = False, use_cpu = False, batch_size = 32):
 
     """
     A wrapper function that assembles all pipeline elements.
@@ -38,6 +38,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
      - model_hyperparams: any hyperparameters to use for the model
      - save_preds: whether or not to save visualized tile predictions
      - use_cpu: whether or not to explicitly use CPU for prediction
+     - batch_size: the batch size used for prediction
     Outputs:
      - A total count for the input mosaic (also saves run results to desired CSV file)
     """
@@ -74,7 +75,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
 
         #PREDICT ON TILES:
         tile_dataset = BirdDatasetPREDICTION('mosaic_tiles', model_name)
-        tile_dataloader = DataLoader(tile_dataset, batch_size = 8, shuffle = False, collate_fn = collate_tiles_PREDICTION, num_workers = num_workers)
+        tile_dataloader = DataLoader(tile_dataset, batch_size = batch_size, shuffle = False, collate_fn = collate_tiles_PREDICTION, num_workers = num_workers)
         print(f'\nPredicting on {len(tile_dataset)} tiles...')
         
         #  get device, only if use_cpu isn't explicitly specified
@@ -313,6 +314,7 @@ if __name__ == '__main__':
     parser.add_argument('write_results_fp', help = 'file path to write pipeline run results to')
 
     #  optional args
+    parser.add_argument('-bs', '--batch_size', help = 'the batch size for prediction', type = int, default = 32)
     parser.add_argument('-nw', '--num_workers', help = 'the number of workers to use in the tile dataloader', type = int, default = 0)
     parser.add_argument('-cfp', '--config_fp', help = 'file path for config, containing hyperparameters for model', default = None)
     parser.add_argument('-sp', '--save_preds', help = 'save predictions for tiles?', type = str2bool, default = False)
@@ -328,4 +330,4 @@ if __name__ == '__main__':
 
     run_pipeline(args.mosaic_fp, args.model_name, args.model_fp, 
                  args.write_results_fp, args.num_workers, model_hyperparams = model_hyperparams, 
-                 save_preds = args.save_preds, use_cpu = args.use_cpu)
+                 save_preds = args.save_preds, use_cpu = args.use_cpu, batch_size = args.batch_size)
