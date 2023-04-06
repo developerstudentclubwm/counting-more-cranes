@@ -155,7 +155,6 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
                         pil_img.save(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'))
                 elif model_name == 'ASPDNet': #saving the pred densities for each tile
                     cm = plt.get_cmap('jet')
-                    print('BATCH SUM:', float(tile_preds.sum()))
                     for den, num in zip(list(tile_preds), tile_nums):
                         den = den.cpu()
                         colored_image = cm(den.numpy()) #applying the color map... makes it easier to look at!
