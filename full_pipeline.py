@@ -58,7 +58,8 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
     for i, path in enumerate(file_paths):
         #PREDICT ON TILES:
         tile_dataset = BirdDatasetPREDICTION(path, model_name)
-        tile_dataloader = DataLoader(tile_dataset, batch_size = 8, shuffle = False, collate_fn = collate_tiles_PREDICTION, num_workers = num_workers)
+        tile_dataloader = DataLoader(tile_dataset, batch_size = batch_size, shuffle = False, 
+                                     collate_fn = collate_tiles_PREDICTION, num_workers = num_workers)
         print(f'\nPredicting on {len(tile_dataset)} tiles...')
         
         #  get device, only if use_cpu isn't explicitly specified
