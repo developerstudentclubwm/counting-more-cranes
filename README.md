@@ -29,3 +29,9 @@ On the W&M lab machines, it's often helpful to run commands using `nohup python 
 4. Activate the virtual environment with: `. ./counting-more-cranes-env/bin/activate` (you must be in the directory _above_ the venv directory for this command).
 5. Install the [nightly build of PyTorch](https://pytorch.org/get-started/locally/) for linux, using `pip` with CUDA 11.8.
 6. Install required packages with: `pip install -r lab_requirements.txt`.
+
+## Running the pipeline
+1. Collect mosaics with the following command: `python3 miscellaneous/collect_2018_mosaics.py [mosaic_directory]`
+2. Make a file called mosaic_filepaths.txt with the filepaths of each mosaic file separated by a newline
+3. Cache tiles by passing mosaic_filepaths.txt to tile_mosaics.py with the following command: `python3 tile_mosaics.py -mf mosaic_filepaths.txt`
+4. Predict the mosaics in mosaic_filepaths.txt with the following command: `python3 full_pipeline.py mosaic_filepaths.txt [MODEL_NAME] [MODEL_FP] [RESULTS_FP]`

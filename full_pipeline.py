@@ -1,3 +1,4 @@
+import glob
 import os
 import sys
 import shutil
@@ -13,6 +14,7 @@ import albumentations as A
 from albumentations.pytorch import ToTensorV2
 import torch
 from torch.utils.data import Dataset, DataLoader
+from tile_mosaics import tile_mosaic, get_tile_dir
 
 sys.path.append(os.path.join(os.getcwd(), 'density_estimation', 'ASPDNet'))
 sys.path.append(os.path.join(os.getcwd(), 'object_detection'))
@@ -45,6 +47,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
     start_time = time.time()
 
     #Loading in multiple images in one file 
+    tile_dir = get_tile_dir()
     with open(mosaic_fp, 'r') as f:
         file_paths = f.readlines()
     
@@ -52,28 +55,8 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
 
     #Store filepaths to mosaics in text file
     for i, path in enumerate(file_paths):
-        mosaic = Image.open(path)
-        
-        #Stripping alpha channel from 2018 imagery
-        if path.endswith('.jp2'):
-            mosaic = Image.fromarray(np.array(mosaic)[ : , : , 0])
-
-        mosaic = mosaic.convert('RGB')
-        
-        #TILE MOSAIC:
-        print(f'Tiling mosaic of size {mosaic.size[0]}x{mosaic.size[1]}...')
-
-        if os.path.isdir('mosaic_tiles'): #if the tile save directory exists, it will be removed
-            shutil.rmtree('mosaic_tiles')
-        os.mkdir('mosaic_tiles') #create an empty directory
-
-        tile_size = (200, 200)
-        tiling_w_o_overlap_NO_BBOXES(mosaic, tile_size = tile_size) #tile the mosaic into non-overlapping tiles + save tiles
-
-        print('Done tiling mosaic!')
-
         #PREDICT ON TILES:
-        tile_dataset = BirdDatasetPREDICTION('mosaic_tiles', model_name)
+        tile_dataset = BirdDatasetPREDICTION(path, model_name)
         tile_dataloader = DataLoader(tile_dataset, batch_size = 8, shuffle = False, collate_fn = collate_tiles_PREDICTION, num_workers = num_workers)
         print(f'\nPredicting on {len(tile_dataset)} tiles...')
         
@@ -229,13 +212,25 @@ class BirdDatasetPREDICTION(Dataset):
     """
     A reduced version of BirdDataset to help read in and preprocess mosaic tiles for prediction.
     Inputs:
-     - root_dir: the root directory for mosaic tiles
+     - mosaic_fp: the filepath of the full mosaic, assume it exists
      - model_name: either Faster R-CNN or ASPDNet
     """
 
-    def __init__(self, root_dir, model_name):
-        self.root_dir = root_dir
-        self.tile_fps = sorted(os.listdir(self.root_dir))
+    def __init__(self, mosaic_fp, model_name):
+        self.mosaic_fp = mosaic_fp
+        tile_dir = get_tile_dir()
+        self.tile_fps = []
+        #Store filepaths to mosaics in text file
+            
+        # takes out everything before the filename as well as the file ending (i.e. "/path/to/file/img_name.tif" becomes "img_name")
+        img_name = ''.join(mosaic_fp.split(os.path.sep)[-1].split('.')[:-1])
+        # search for cached tiles
+        tiles = glob.glob(f'./{tile_dir}/{img_name}-tile*')
+
+        if len(tiles) == 0:
+            tile_mosaic(mosaic_fp)
+            tiles = glob.glob(f'./{tile_dir}/{img_name}-tile*')
+        self.tile_fps = sorted(tiles)
 
         self.transforms = []
         if model_name == 'ASPDNet': #PyTorch's Faster R-CNN impelementation handles normalization...
@@ -244,7 +239,7 @@ class BirdDatasetPREDICTION(Dataset):
         self.transforms = A.Compose(self.transforms)
 
     def __getitem__(self, index):
-        tile_fp = os.path.join(self.root_dir, self.tile_fps[index])
+        tile_fp = self.tile_fps[index]
         tile_num = int(tile_fp.split('_')[-1].replace('.tif', '')) #grabbing this for saving preds
         tile = Image.open(tile_fp).convert('RGB')
         tile = np.array(tile)
