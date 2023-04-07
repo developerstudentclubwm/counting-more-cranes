@@ -10,16 +10,6 @@ Pre-requisites for running the prediction pipeline (`full_pipeline.py`):
 1. Model saves for Faster R-CNN or ASPDNet.
 2. The single mosaic (currently can only handle one at a time) to predict on (or single test images for local testing, e.g., from the final annotated dataset).
 
-## Using the prediction pipeline
-
-To run `final_pipeline.py`, use the command `python3 full_pipeline.py MOSAIC_FP MODEL_NAME MODEL_FP RESULTS_FP`. Arguments are explained below:
-- `MOSAIC_FP`: the filepath for the mosaic (or single image) to predict on.
-- `MODEL_NAME`: either "ASPDNet" or "faster_rcnn".
-- `MODEL_FP`: the filepath for the pre-trained model.
-- `RESULTS_FP`: the filepath for saving prediction results on the inputted mosaic. If the file doesn't exit, it will be created.
-
-On the W&M lab machines, it's often helpful to run commands using `nohup python ... &` to ensure it keeps running, even after exiting the SSH session. You can check the progress of the process using `ps xw` and by looking at the `nohup.out` file that captures the script outputs.
-
 ## Lab machine setup instructions 
 
 1. SSH into the W&M lab computers (if needed, [create an account](https://accounts.cs.wm.edu/newuser_template)).
@@ -31,7 +21,12 @@ On the W&M lab machines, it's often helpful to run commands using `nohup python 
 6. Install required packages with: `pip install -r lab_requirements.txt`.
 
 ## Running the pipeline
-1. Collect mosaics with the following command: `python3 miscellaneous/collect_2018_mosaics.py [mosaic_directory]`
-2. Make a file called mosaic_filepaths.txt with the filepaths of each mosaic file separated by a newline
-3. Cache tiles by passing mosaic_filepaths.txt to tile_mosaics.py with the following command: `python3 tile_mosaics.py -mf mosaic_filepaths.txt`
-4. Predict the mosaics in mosaic_filepaths.txt with the following command: `python3 full_pipeline.py mosaic_filepaths.txt [MODEL_NAME] [MODEL_FP] [RESULTS_FP]`
+1. EITHER: (A) Collect mosaics with the following command: `python miscellaneous/collect_2018_mosaics.py [MOSAIC_DIRECTORY]` or (B) make a file called `mosaic_filepaths.txt` with the filepaths of each mosaic file separated by a newline.
+   - `MOSAIC_DIRECTORY`: the directory containing all mosaics to extract (potentially in sub-directories).
+2. Extract and cache tiles by passing `mosaic_filepaths.txt` to `tile_mosaics.py` with the following command: `python tile_mosaics.py -mf mosaic_filepaths.txt`.
+3. Predict on the mosaics from `mosaic_filepaths.txt` with the following command: `python3 full_pipeline.py mosaic_filepaths.txt [MODEL_NAME] [MODEL_FP] [RESULTS_FP]`.
+   - `MODEL_NAME`: either "ASPDNet" or "faster_rcnn".
+   - `MODEL_FP`: the filepath for the pre-trained model.
+   - `RESULTS_FP`: the filepath for saving prediction results on the inputted mosaic. If the file doesn't exit, it will be created.
+
+On the W&M lab machines, it's often helpful to run commands using `nohup python ... &` to ensure it keeps running, even after exiting the SSH session. You can check the progress of the process using `ps xw` and by looking at the `nohup.out` file that captures the script outputs.
