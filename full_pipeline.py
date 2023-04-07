@@ -8,7 +8,7 @@ import time
 import argparse
 from datetime import date
 import gc
-from PIL import Image, ImageDraw
+from PIL import Image, ImageDraw, ImageFont
 import matplotlib.pyplot as plt
 import albumentations as A
 from albumentations.pytorch import ToTensorV2
@@ -26,7 +26,7 @@ from object_detection.faster_rcnn_model import *
 
 Image.MAX_IMAGE_PIXELS = None
 
-def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_workers, model_hyperparams = None, save_preds = False, use_cpu = False):
+def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_workers, model_hyperparams = None, save_preds = False, use_cpu = False, batch_size = 32):
 
     """
     A wrapper function that assembles all pipeline elements.
@@ -40,6 +40,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
      - model_hyperparams: any hyperparameters to use for the model
      - save_preds: whether or not to save visualized tile predictions
      - use_cpu: whether or not to explicitly use CPU for prediction
+     - batch_size: the batch size used for prediction
     Outputs:
      - A total count for the input mosaic (also saves run results to desired CSV file)
     """
@@ -57,7 +58,8 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
     for i, path in enumerate(file_paths):
         #PREDICT ON TILES:
         tile_dataset = BirdDatasetPREDICTION(path, model_name)
-        tile_dataloader = DataLoader(tile_dataset, batch_size = 8, shuffle = False, collate_fn = collate_tiles_PREDICTION, num_workers = num_workers)
+        tile_dataloader = DataLoader(tile_dataset, batch_size = batch_size, shuffle = False, 
+                                     collate_fn = collate_tiles_PREDICTION, num_workers = num_workers)
         print(f'\nPredicting on {len(tile_dataset)} tiles...')
         
         #  get device, only if use_cpu isn't explicitly specified
@@ -98,7 +100,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
 
         print('\tProducing counts...')
 
-        if save_preds: #create an empty directory for preds
+        if save_preds and not os.path.exists('mosaic_tiles/predictions'): #create an empty directory for preds
             os.mkdir('mosaic_tiles/predictions')
 
         pred_start_time = time.time()
@@ -108,7 +110,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
         for i, batch in enumerate(tile_dataloader):
 
             print(f'\t\tBatch {i + 1}/{len(tile_dataloader)}')
-            tile_batch, tile_nums = batch #getting out the content from the dataloader
+            tile_batch, tile_fps = batch #getting out the content from the dataloader
             tile_batch = tile_batch.to(device) #loading the batch onto the same device as the model
 
             if model_name == 'faster_rcnn':
@@ -126,24 +128,44 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
             #Saving predictions as we go
             if save_preds:
                 if model_name == 'faster_rcnn': #saving tiles w/bboxes overlaid
-                    for i, (img, num) in enumerate(zip(tile_batch, tile_nums)):
+                    for i, (img, fp) in enumerate(zip(tile_batch, tile_fps)):
                         img = img.cpu() #moving to CPU to avoid CUDA errors...
                         img = (np.moveaxis(img.numpy(), 0, -1) * 255).astype(np.uint8)
                         pred_boxes = tile_preds[i]['boxes'].tolist()
 
+                        offset = 15
+                        background = Image.new('RGB', (img.shape[0], img.shape[1] + offset), (255, 255, 255))
                         pil_img = Image.fromarray(img)
-                        draw = ImageDraw.Draw(pil_img)
+                        Image.Image.paste(background, pil_img, (0, offset))
+
+                        draw = ImageDraw.Draw(background)
                         for b in pred_boxes: #drawing bboxes onto the tile
+                            b = (b[0], b[1] + offset, b[2], b[3] + offset)
                             draw.rectangle(b, outline = 'red', width = 1)
-                        pil_img.save(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'))
+                        draw.text((2, 2), str(len(pred_boxes)), fill = (0, 0, 0))
+
+                        tile_save_name = f'{os.path.basename(fp).split(".")[0]}_PRED.png'
+
+                        background.save(os.path.join('mosaic_tiles', 'predictions', tile_save_name))
                 elif model_name == 'ASPDNet': #saving the pred densities for each tile
                     cm = plt.get_cmap('jet')
-                    for den, num in zip(list(tile_preds), tile_nums):
+                    for den, fp in zip(list(tile_preds), tile_fps):
                         den = den.cpu()
                         colored_image = cm(den.numpy()) #applying the color map... makes it easier to look at!
 
-                        pil_img = Image.fromarray((colored_image * 255).astype(np.uint8)[ : , : , : 3]) #converting to PIL image #the heck 
-                        pil_img.save(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'))
+                        # plotting the density w/the predicted count
+                        fig, ax = plt.subplots()
+
+                        ax.imshow(colored_image)
+                        ax.set_title(round(float(den.sum()), 3))
+                        ax.axis('off')
+                        ax.set_xticks([])
+                        ax.set_yticks([])
+
+                        tile_save_name = f'{os.path.basename(fp).split(".")[0]}_PRED.png'
+
+                        fig.savefig(os.path.join('mosaic_tiles', 'predictions', tile_save_name), dpi = 50, bbox_inches = 'tight')
+                        plt.close(fig)
 
         pred_time = time.time() - pred_start_time
 
@@ -233,21 +255,21 @@ class BirdDatasetPREDICTION(Dataset):
         self.tile_fps = sorted(tiles)
 
         self.transforms = []
-        if model_name == 'ASPDNet': #PyTorch's Faster R-CNN impelementation handles normalization...
+        if model_name == 'ASPDNet': #PyTorch's Faster R-CNN implementation handles normalization...
             self.transforms.append(A.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225], max_pixel_value = 1))
         self.transforms.append(ToTensorV2())
         self.transforms = A.Compose(self.transforms)
 
     def __getitem__(self, index):
         tile_fp = self.tile_fps[index]
-        tile_num = int(tile_fp.split('_')[-1].replace('.tif', '')) #grabbing this for saving preds
+        # tile_num = int(tile_fp.split('_')[-1].replace('.tif', '')) #grabbing this for saving preds
         tile = Image.open(tile_fp).convert('RGB')
         tile = np.array(tile)
 
         preprocessed_tile = tile / 255
         preprocessed_tile = self.transforms(image = preprocessed_tile)['image'].float() #making sure that its dtype is float32
 
-        return preprocessed_tile, tile_num
+        return preprocessed_tile, tile_fp
 
     def __len__(self):
         return len(self.tile_fps)
@@ -256,14 +278,14 @@ def collate_tiles_PREDICTION(batch):
     """
     A workaround to ensure that we can retrieve the tile number for saving pipeline predictions.
     Inputs:
-      - batch: a list of tuples w/format [(tile, tile_num), ...]
+      - batch: a list of tuples w/format [(tile, tile_fp), ...]
     Outputs:
       - A tuple w/a list of tiles and a list of tile numbers
     """
     tiles = torch.stack([b[0] for b in batch]) 
-    tile_nums = [b[1] for b in batch]
+    tile_fps = [b[1] for b in batch]
 
-    return tiles, tile_nums
+    return tiles, tile_fps
 
 def str2bool(arg):
     """
@@ -292,6 +314,7 @@ if __name__ == '__main__':
     parser.add_argument('write_results_fp', help = 'file path to write pipeline run results to')
 
     #  optional args
+    parser.add_argument('-bs', '--batch_size', help = 'the batch size for prediction', type = int, default = 32)
     parser.add_argument('-nw', '--num_workers', help = 'the number of workers to use in the tile dataloader', type = int, default = 0)
     parser.add_argument('-cfp', '--config_fp', help = 'file path for config, containing hyperparameters for model', default = None)
     parser.add_argument('-sp', '--save_preds', help = 'save predictions for tiles?', type = str2bool, default = False)
@@ -307,4 +330,4 @@ if __name__ == '__main__':
 
     run_pipeline(args.mosaic_fp, args.model_name, args.model_fp, 
                  args.write_results_fp, args.num_workers, model_hyperparams = model_hyperparams, 
-                 save_preds = args.save_preds, use_cpu = args.use_cpu)
+                 save_preds = args.save_preds, use_cpu = args.use_cpu, batch_size = args.batch_size)
