@@ -24,7 +24,7 @@ Pre-requisites for running the prediction pipeline (`full_pipeline.py`):
 1. EITHER: (A) Collect mosaics with the following command: `python miscellaneous/collect_2018_mosaics.py [MOSAIC_DIRECTORY]` or (B) make a file called `mosaic_filepaths.txt` with the filepaths of each mosaic file separated by a newline.
    - `MOSAIC_DIRECTORY`: the directory containing all mosaics to extract (potentially in sub-directories).
 2. Extract and cache tiles by passing `mosaic_filepaths.txt` to `tile_mosaics.py` with the following command: `python tile_mosaics.py -mf mosaic_filepaths.txt`.
-3. Predict on the mosaics from `mosaic_filepaths.txt` with the following command: `python3 full_pipeline.py mosaic_filepaths.txt [MODEL_NAME] [MODEL_FP] [RESULTS_FP]`.
+3. Predict on the mosaics from `mosaic_filepaths.txt` with the following command: `python full_pipeline.py mosaic_filepaths.txt [MODEL_NAME] [MODEL_FP] [RESULTS_FP]`.
    - `MODEL_NAME`: either "ASPDNet" or "faster_rcnn".
    - `MODEL_FP`: the filepath for the pre-trained model.
    - `RESULTS_FP`: the filepath for saving prediction results on the inputted mosaic. If the file doesn't exit, it will be created.
