@@ -100,7 +100,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
 
         print('\tProducing counts...')
 
-        if save_preds: #create an empty directory for preds
+        if save_preds and not os.path.exists('mosaic_tiles/predictions'): #create an empty directory for preds
             os.mkdir('mosaic_tiles/predictions')
 
         pred_start_time = time.time()
@@ -110,7 +110,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
         for i, batch in enumerate(tile_dataloader):
 
             print(f'\t\tBatch {i + 1}/{len(tile_dataloader)}')
-            tile_batch, tile_nums = batch #getting out the content from the dataloader
+            tile_batch, tile_fps = batch #getting out the content from the dataloader
             tile_batch = tile_batch.to(device) #loading the batch onto the same device as the model
 
             if model_name == 'faster_rcnn':
@@ -128,7 +128,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
             #Saving predictions as we go
             if save_preds:
                 if model_name == 'faster_rcnn': #saving tiles w/bboxes overlaid
-                    for i, (img, num) in enumerate(zip(tile_batch, tile_nums)):
+                    for i, (img, fp) in enumerate(zip(tile_batch, tile_fps)):
                         img = img.cpu() #moving to CPU to avoid CUDA errors...
                         img = (np.moveaxis(img.numpy(), 0, -1) * 255).astype(np.uint8)
                         pred_boxes = tile_preds[i]['boxes'].tolist()
@@ -144,10 +144,12 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
                             draw.rectangle(b, outline = 'red', width = 1)
                         draw.text((2, 2), str(len(pred_boxes)), fill = (0, 0, 0))
 
-                        background.save(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'))
+                        tile_save_name = f'{os.path.basename(fp).split(".")[0]}_PRED.png'
+
+                        background.save(os.path.join('mosaic_tiles', 'predictions', tile_save_name))
                 elif model_name == 'ASPDNet': #saving the pred densities for each tile
                     cm = plt.get_cmap('jet')
-                    for den, num in zip(list(tile_preds), tile_nums):
+                    for den, fp in zip(list(tile_preds), tile_fps):
                         den = den.cpu()
                         colored_image = cm(den.numpy()) #applying the color map... makes it easier to look at!
 
@@ -160,7 +162,9 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
                         ax.set_xticks([])
                         ax.set_yticks([])
 
-                        fig.savefig(os.path.join('mosaic_tiles', 'predictions', f'pred_tile_{num}.tif'), dpi = 50, bbox_inches = 'tight')
+                        tile_save_name = f'{os.path.basename(fp).split(".")[0]}_PRED.png'
+
+                        fig.savefig(os.path.join('mosaic_tiles', 'predictions', tile_save_name), dpi = 50, bbox_inches = 'tight')
                         plt.close(fig)
 
         pred_time = time.time() - pred_start_time
@@ -258,14 +262,14 @@ class BirdDatasetPREDICTION(Dataset):
 
     def __getitem__(self, index):
         tile_fp = self.tile_fps[index]
-        tile_num = int(tile_fp.split('_')[-1].replace('.tif', '')) #grabbing this for saving preds
+        # tile_num = int(tile_fp.split('_')[-1].replace('.tif', '')) #grabbing this for saving preds
         tile = Image.open(tile_fp).convert('RGB')
         tile = np.array(tile)
 
         preprocessed_tile = tile / 255
         preprocessed_tile = self.transforms(image = preprocessed_tile)['image'].float() #making sure that its dtype is float32
 
-        return preprocessed_tile, tile_num
+        return preprocessed_tile, tile_fp
 
     def __len__(self):
         return len(self.tile_fps)
@@ -274,14 +278,14 @@ def collate_tiles_PREDICTION(batch):
     """
     A workaround to ensure that we can retrieve the tile number for saving pipeline predictions.
     Inputs:
-      - batch: a list of tuples w/format [(tile, tile_num), ...]
+      - batch: a list of tuples w/format [(tile, tile_fp), ...]
     Outputs:
       - A tuple w/a list of tiles and a list of tile numbers
     """
     tiles = torch.stack([b[0] for b in batch]) 
-    tile_nums = [b[1] for b in batch]
+    tile_fps = [b[1] for b in batch]
 
-    return tiles, tile_nums
+    return tiles, tile_fps
 
 def str2bool(arg):
     """
