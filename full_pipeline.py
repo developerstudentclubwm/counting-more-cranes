@@ -193,42 +193,6 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
 
     return total_count
 
-def tiling_w_o_overlap_NO_BBOXES(image, tile_size = (200, 200)):
-
-    """
-    A basic version of tiling w/o overlap that doesn't accept annotations.
-    Inputs:
-     - image: the image to tile w/o overlap
-     - tile_size: the size of the tile, in format (width, height)
-    Outputs:
-     - Nothing... tiles are saved as part of the process
-    """
-
-    padded_image = pad_parent_for_tiles(image, tile_size)
-    tile_width, tile_height = tile_size
-    image_width, image_height = padded_image.size
-
-    padded_image = np.array(padded_image)
-
-    #  freeing up memory
-    del image
-    gc.collect()
-
-    zero_tensor = torch.zeros(*(tile_size[0], tile_size[1], 3)) #represents a black tile
-
-    i = 0
-    for h in range(0, (image_height + 1) - tile_height, tile_height):
-        for w in range(0, (image_width + 1) - tile_width, tile_width):
-            coords = (w, h, w + tile_width, h + tile_height)
-            crop = A.Crop(*coords)
-            t = crop(image = padded_image)
-
-            tile = Image.fromarray(t['image'])
-            tensor_tile = torch.from_numpy(np.array(tile))
-            if not bool(torch.all(torch.eq(tensor_tile, zero_tensor))): #only saving if it's not an all-black tile
-                tile.save(os.path.join('mosaic_tiles', f'tile_{i}.tif'))
-                i += 1
-
 class BirdDatasetPREDICTION(Dataset):
 
     """
