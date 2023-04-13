@@ -13,6 +13,7 @@ mosaic_tiles
 *.ckpt
 *.csv
 *.txt
+*.sh
 
 lightning_logs
 
