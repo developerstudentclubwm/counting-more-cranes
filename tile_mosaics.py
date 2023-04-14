@@ -5,6 +5,7 @@ from PIL import Image
 import numpy as np
 
 tiles_dir = 'mosaic_tiles'
+Image.MAX_IMAGE_PIXELS = None
 
 # for use outside of this file
 def get_tile_dir() -> str:
@@ -13,11 +14,14 @@ def get_tile_dir() -> str:
 def tile_file(file: str, tile_size = (200,200)):
     tw, th = tile_size
     img_name = file.split(os.path.sep)[-1].split('.')[0]
-    # open image and store as numpy array
+
+    # open image and store as numpy array - PIL strips alpha channel from 2018 imagery!
     img = Image.open(file).convert('L')
     img_array = np.asarray(img)
+
     # pad image to be divisible by tw and th
     padded_array = np.pad(img_array, ((0, th - img.height % th), (0, tw - img.width % tw)))
+
     # free up some memory
     del img, img_array
     gc.collect()
@@ -44,7 +48,7 @@ def tile_mosaic(file: str, tile_size = (200,200)):
 
     If the size of the image at file does not fit tile_size, it will be padded with 0 values
     """
-    if not file.endswith('.tif') and file.endswith('.TIF'):
+    if not file.endswith('.tif') and file.endswith('.TIF') and not file.endswith('.jp2'):
         raise ValueError(f'File {file} is not a .tif or .TIF file')
     # make tile directory if it doesn't exist
     if not os.path.exists(tiles_dir):
@@ -85,7 +89,7 @@ def tile_mosaics_from_file(mosaic_file: str, tile_size = (200, 200)):
         files = [path.strip() for path in lines]
     
     for file in files:
-        if not file.endswith('.tif') and not file.endswith('.TIF'):
+        if not file.endswith('.tif') and not file.endswith('.TIF') and not file.endswith('.jp2'):
             continue
         print(file)
         tile_file(file, tile_size)

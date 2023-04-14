@@ -24,8 +24,6 @@ from density_estimation.ASPDNet_model import ASPDNetLightning
 from density_estimation.ASPDNet.model import ASPDNet
 from object_detection.faster_rcnn_model import *
 
-Image.MAX_IMAGE_PIXELS = None
-
 def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_workers, model_hyperparams = None, save_preds = False, use_cpu = False, batch_size = 32):
 
     """
@@ -226,7 +224,6 @@ class BirdDatasetPREDICTION(Dataset):
 
     def __getitem__(self, index):
         tile_fp = self.tile_fps[index]
-        # tile_num = int(tile_fp.split('_')[-1].replace('.tif', '')) #grabbing this for saving preds
         tile = Image.open(tile_fp).convert('RGB')
         tile = np.array(tile)
 
