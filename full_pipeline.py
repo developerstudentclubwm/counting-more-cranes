@@ -144,7 +144,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
                             draw.rectangle(b, outline = 'red', width = 1)
                         draw.text((2, 2), str(len(pred_boxes)), fill = (0, 0, 0))
 
-                        tile_save_name = f'{os.path.basename(fp).split(".")[0]}_PRED.png'
+                        tile_save_name = f'{os.path.basename(fp).split(".")[0]}_FRCNN.png'
 
                         background.save(os.path.join('mosaic_tiles', 'predictions', tile_save_name))
                 elif model_name == 'ASPDNet': #saving the pred densities for each tile
@@ -162,7 +162,7 @@ def run_pipeline(mosaic_fp, model_name, model_save_fp, write_results_fp, num_wor
                         ax.set_xticks([])
                         ax.set_yticks([])
 
-                        tile_save_name = f'{os.path.basename(fp).split(".")[0]}_PRED.png'
+                        tile_save_name = f'{os.path.basename(fp).split(".")[0]}_ASPDNET.png'
 
                         fig.savefig(os.path.join('mosaic_tiles', 'predictions', tile_save_name), dpi = 50, bbox_inches = 'tight')
                         plt.close(fig)
