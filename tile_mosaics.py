@@ -16,10 +16,8 @@ def tile_file(file: str, tile_size = (200,200)):
     # open image and store as numpy array
     img = Image.open(file).convert('L')
     img_array = np.asarray(img)
-
     # pad image to be divisible by tw and th
-    padded_array = np.pad(img_array, ((0, int(img.width % tw)), (0, int(img.height % th))))
-    
+    padded_array = np.pad(img_array, ((0, th - img.height % th), (0, tw - img.width % tw)))
     # free up some memory
     del img, img_array
     gc.collect()
