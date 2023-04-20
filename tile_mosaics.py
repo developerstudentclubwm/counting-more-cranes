@@ -48,8 +48,8 @@ def tile_mosaic(file: str, tile_size = (200,200)):
 
     If the size of the image at file does not fit tile_size, it will be padded with 0 values
     """
-    if not file.endswith('.tif') and file.endswith('.TIF') and not file.endswith('.jp2'):
-        raise ValueError(f'File {file} is not a .tif or .TIF file')
+    if not file.endswith('.tif') and file.endswith('.TIF') and not file.endswith('.jp2') and not file.endswith('.jpg'):
+        raise ValueError(f'File {file} is not a .tif, .TIF, .jp2, or .jpg file')
     # make tile directory if it doesn't exist
     if not os.path.exists(tiles_dir):
         os.mkdir(tiles_dir)
@@ -89,7 +89,7 @@ def tile_mosaics_from_file(mosaic_file: str, tile_size = (200, 200)):
         files = [path.strip() for path in lines]
     
     for file in files:
-        if not file.endswith('.tif') and not file.endswith('.TIF') and not file.endswith('.jp2'):
+        if not file.endswith('.tif') and not file.endswith('.TIF') and not file.endswith('.jp2') and not file.endswith('.jpg'):
             continue
         print(file)
         tile_file(file, tile_size)
