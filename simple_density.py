@@ -1,6 +1,12 @@
 import torch
 import torch.nn as nn
 import torchvision.models as models
+import torch.nn.functional as F
+
+#outputted density/variance maps are of shape(1, 2, 1, 1)
+#batch size, number of channels, width, height 
+
+
 
 class MultiTaskAU(nn.Module):
     #color channel, height, width 
@@ -8,6 +14,12 @@ class MultiTaskAU(nn.Module):
         super(MultiTaskAU, self).__init__()
         #initializes ResNet model 
         self.resnet = models.resnet50(pretrained=True)
+
+
+        #1x1 conv layer with 2 output filters
+        #global pooling layer is added each branch 
+        #resulting scalar count is subtracted
+
         #converts to sequential model
         self.resnet = nn.Sequential(*list(self.resnet.children())[:-1])
         #conv layer with 2048 input channels, 2 output channels, and kernel size of 1
@@ -15,10 +27,17 @@ class MultiTaskAU(nn.Module):
         self.conv = nn.Conv2d(2048, 2, kernel_size=1)
         #avg pooling layer
         #ouputs tensor of batch size and number of channels
-        self.global_pool = nn.AdaptiveAvgPool2d((1, 1))
+        self.global_pool = nn.AdaptiveAvgPool2d((1,1))
         self.sub = torch.sub
 
     def forward(self, input_count, input_pair1, input_pair2):
+
+        #resize to macth input size (potentially not need?)
+        input_count = F.interpolate(input_count, size=(200, 200), mode='bilinear', align_corners=False)
+        input_pair1 = F.interpolate(input_pair1, size=(200, 200), mode='bilinear', align_corners=False)
+        input_pair2 = F.interpolate(input_pair2, size=(200, 200), mode='bilinear', align_corners=False)
+
+
         output_count = self.resnet(input_count)
         output_pair1 = self.resnet(input_pair1)
         output_pair2 = self.resnet(input_pair2)
@@ -29,7 +48,10 @@ class MultiTaskAU(nn.Module):
 
         output_pair1 = self.global_pool(output_pair1)
         output_pair2 = self.global_pool(output_pair2)
-        pair_diff = self.sub(output_pair2, output_pair1)
+        pair_diff = output_pair2 - output_pair1
+
+        print(output_count)
+        print(input_count)
 
         return output_count, pair_diff
     
@@ -45,6 +67,9 @@ if __name__ == '__main__':
     
 
     model = MultiTaskAU()
+    print(model)
+
+    """
     #test with random tensors 
     input_count = torch.randn(1, 3, 200, 200)
     input_pair1 = torch.randn(1, 3, 200, 200)
@@ -75,6 +100,8 @@ if __name__ == '__main__':
 
     #display tensor value 
     print(mosaic_tensor)
+    """
+    
     
 
 
