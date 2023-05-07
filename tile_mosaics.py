@@ -1,6 +1,11 @@
 import argparse
 import os
 import gc
+import glob
+import albumentations as A
+from albumentations.pytorch import ToTensorV2
+from torch import empty, float32
+from utils import purge_invalid_bboxes
 from PIL import Image
 import numpy as np
 
@@ -10,14 +15,58 @@ tiles_dir = 'mosaic_tiles'
 def get_tile_dir() -> str:
     return tiles_dir
 
+def pad_array(array: np.array, tile_size = (200,200)) -> np.array:
+    tw, th = tile_size
+    width, height = array.shape
+    return np.pad(array, ((0, tw - width % tw), (0, th - height % th)))
+
+def tile_and_annotate_file(file, bboxes, labels, normalize=False, tile_size=(200,200)):
+    pass
+
+def annotate_cached_tiles(file, bboxes, labels, normalize=False):
+    img_name = file.split(os.path.sep)[-1]
+    tiles = glob.glob(os.path.join(tiles_dir, f'tile_*-{img_name}'))
+
+    img_array = np.asarray(Image.open(file).convert('L'))
+    iw = img_array.width + (tw - img_array.width % tw)
+
+    normalization = A.Normalize(mean = [0.485, 0.456, 0.406], std = [0.229, 0.224, 0.225], max_pixel_value = 1)
+
+    tile_tensors = []
+    targets = []
+    for tile in tiles:
+        tile_array = np.asarray(Image.open(tile).convert('L'))
+        tw, th = tile_array.shape
+        num = int(tile[tile.index('tile_')+len('tile_'):tile.index('-')])
+        # Convert 
+        y = (num // (iw//tw)) * th
+        x = (num % (iw//tw)) * tw
+        bboxes = [[xmin-x, ymin-y, xmax-x, ymax-y] for xmin, ymin, xmax, ymax in bboxes]
+        
+        transforms = A.Compose([], A.BboxParams(format= 'pascal_voc', label_fields = ['class_labels'], min_visibility = 0.5))
+        t = transforms(image = tile_array, bboxes = bboxes, class_labels = labels)
+        if len(t['bboxes']) == 0:
+            new_bboxes = empty((0, 4), dtype = float32)
+        else:
+            new_bboxes = purge_invalid_bboxes(t['bboxes'])
+        target_dict = {'boxes' : new_bboxes, 'labels' : np.ones((len(new_bboxes), ))}
+
+        image = t['image'] / 255
+        if normalize:
+            image = normalization(image = image)['image']
+        tile_tensors.append(ToTensorV2()(image = image)['image'])
+        targets.append(target_dict)
+
+    return tiles, targets
+
 def tile_file(file: str, tile_size = (200,200)):
     tw, th = tile_size
-    img_name = file.split(os.path.sep)[-1].split('.')[0]
+    img_name = file.split(os.path.sep)[-1]
     # open image and store as numpy array
     img = Image.open(file).convert('L')
     img_array = np.asarray(img)
     # pad image to be divisible by tw and th
-    padded_array = np.pad(img_array, ((0, th - img.height % th), (0, tw - img.width % tw)))
+    padded_array = pad_array(img_array, tile_size)
     # free up some memory
     del img, img_array
     gc.collect()
@@ -26,7 +75,7 @@ def tile_file(file: str, tile_size = (200,200)):
     for row in range(0, padded_array.shape[0]-1, tw):
         for col in range(0, padded_array.shape[1]-1, th):
             # file name of new tile
-            tile_name = os.path.join(tiles_dir, f"{img_name}-tile_{tile_count}.tif")
+            tile_name = os.path.join(tiles_dir, f"tile_{tile_count}-{img_name}")
             # if tile already exists, skip
             if not os.path.isfile(tile_name):
                 # segment padded array into a tw by th tile
@@ -79,7 +128,6 @@ def tile_mosaics_from_file(mosaic_file: str, tile_size = (200, 200)):
     # make tile directory if it doesn't exist
     if not os.path.exists(tiles_dir):
         os.mkdir(tiles_dir)
-    tw, th = tile_size
     with open(mosaic_file, 'r') as f:
         lines = f.readlines()
         files = [path.strip() for path in lines]
@@ -99,13 +147,12 @@ def main():
     parser.add_argument('-f', '--file', type=str, help='filepath for mosaic', default=None)
     parser.add_argument('-d', '--directory', type=str, help='filepath for mosaic directory', default=None)
     parser.add_argument('-mf', '--mosaic-file', type=str, help='filepath for file of mosaics', default=None)
-    #parser.add_argument('-p', '--padding', action='store_false', help='pad black pixels if tiles don\'t fit neatly (defaults to true)')         # padding 
+    parser.add_argument('-a', '--annotate', action='store_true', help='annotate images')         # padding 
     args = parser.parse_args()
-
+    print(args.annotate)
     # if more than one of file, directory, or mosaic_file were passed
     if int(bool(args.file)) + int(bool(args.directory)) + int(bool(args.mosaic_file)) != 1:
         raise argparse.ArgumentTypeError('Include either \'--file\' or \'--directory\' or \'--mosaic-file\' in command line')
-        return
 
     tw, th = args.tile_width, args.tile_height
     # tile a single .tif file

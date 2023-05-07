@@ -74,28 +74,22 @@ class BirdDataset(Dataset):
         elif self.tiling_method == 'w_overlap':
             pass
 
+        batch_of_tiles = []
         if self.annotation_mode == 'bboxes': #ensuring that the return is formatted correctly for Faster R-CNN
-            batch_of_tiles = []
-
             img_name = self.image_fps[index].replace('.TIF', '').replace('.tif', '') #this is necessary for calculating metrics...
             for i, content in enumerate(zip(tiles, targets)):
                 img, target = content
                 img = img.float() #making it float32 rather than float64
-                target_dict = {}
-                target_dict['boxes'] = torch.as_tensor(target['boxes'], dtype = torch.float32)
-                target_dict['labels'] = torch.as_tensor(target['labels'], dtype = torch.int64)
+                target_dict = dict(boxes=torch.as_tensor(target['boxes'], dtype=torch.float32),
+                                   labels=torch.as_tensor(target['labels'], dtype = torch.int64))
                 batch_of_tiles.append((img, target_dict, f'{img_name}_{i}', f'{img_name}_{i}'))
         elif self.annotation_mode == 'regression':
-            batch_of_tiles = []
-
             for content in zip(tiles, targets):
                 img, target = content
                 count = get_regression(target['boxes']) #turning bbox annotations into an integer count
 
                 batch_of_tiles.append((img, count))
         elif self.annotation_mode == 'points':
-            batch_of_tiles = []
-
             for content in zip(tiles, targets):
                 img, target = content
                 density = density_from_bboxes(target['boxes'], img, filter_type = 'fixed', sigma = self.sigma)
